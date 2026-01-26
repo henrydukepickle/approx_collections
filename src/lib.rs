@@ -28,15 +28,18 @@
 //!
 //! The `rustc-hash` feature is enabled by default, and uses a faster hashing
 //! algorithm for the hash map inside [`FloatPool`].
-#[cfg(test)]
-pub mod derive_tests;
+//!
+//! The `derive` feature is enabled by default, and provides derive macros for
+//! [`ApproxEq`] and [`ApproxEqZero`].
 
 pub mod hash_map;
 pub mod pool;
 pub mod precision;
 pub mod traits;
 
+#[cfg(feature = "derive")]
+pub use approx_collections_derive::{ApproxEq, ApproxEqZero};
 pub use hash_map::ApproxHashMap;
-pub use pool::{FloatPool, FloatPoolIter};
+pub use pool::FloatPool;
 pub use precision::Precision;
 pub use traits::*;

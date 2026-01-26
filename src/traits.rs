@@ -1,9 +1,7 @@
 //! Common traits related to approximate equality.
 
-use std::{
-    cmp::Ordering,
-    hash::{Hash, Hasher},
-};
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 
 use crate::Precision;
 
@@ -24,6 +22,9 @@ macro_rules! impl_for_tuples {
 
 /// Trait for types that can be approximately compared for equality with each
 /// other.
+///
+/// A derive macro is available with the crate feature `derive`. See
+/// [`approx_collections_derive::ApproxEq`].
 pub trait ApproxEq: std::fmt::Debug {
     /// Returns whether `self` and `other` are approximately equal according to
     /// the precision.
@@ -85,6 +86,9 @@ macro_rules! impl_approx_eq_for_tuple {
 impl_for_tuples!(impl_approx_eq_for_tuple);
 
 /// Trait for types that can be approximately compared to some zero value.
+///
+/// A derive macro is available with the crate feature `derive`. See
+/// [`approx_collections_derive::ApproxEqZero`].
 pub trait ApproxEqZero {
     /// Returns whether `self` is approximately zero according to the precision.
     ///
@@ -306,7 +310,7 @@ impl ApproxHash for f32 {
 }
 impl<T: ApproxHash> ApproxHash for [T] {
     fn intern_floats<F: FnMut(&mut f64)>(&mut self, f: &mut F) {
-        self.into_iter().for_each(|x| x.intern_floats(f));
+        self.iter_mut().for_each(|x| x.intern_floats(f));
     }
 
     fn interned_eq(&self, other: &Self) -> bool {
