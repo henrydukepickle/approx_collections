@@ -4,7 +4,8 @@
 // included to test the proc macro to make sure the code it generates doesn't
 // throw any errors. Thus I allow dead code.
 
-use approx_collections::{ApproxEq, ApproxEqZero, Precision};
+use approx_collections::{ApproxEq, ApproxEqZero, ApproxInternable, Precision};
+use approx_collections_derive::ApproxInternable;
 
 fn main() {}
 
@@ -75,6 +76,26 @@ where
 enum Test {
     One(f64, f64),
     Two { x: f64, y: f64 },
+}
+#[derive(ApproxInternable)]
+struct InternTest {
+    x: f64,
+    #[approx_internable_non_float]
+    y: u64,
+}
+
+#[derive(ApproxInternable)]
+struct UnnamedInternTest(f64, #[approx_internable_non_float] u64);
+
+#[derive(ApproxInternable)]
+enum InternTestEnum {
+    First,
+    Second(f32, #[approx_internable_non_float] usize),
+    Third {
+        x: f32,
+        #[approx_internable_non_float]
+        _y: usize,
+    },
 }
 
 ///examples for both ApproxEq and ApproxEqZero, exactly as in the docs for the proc macros.

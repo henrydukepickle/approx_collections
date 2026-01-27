@@ -3,7 +3,8 @@
 use proc_macro::{Span, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 use syn::{
-    Data, DeriveInput, Error, Fields, GenericParam, Generics, Ident, Variant, parse_macro_input,
+    Data, DeriveInput, Error, Field, Fields, GenericParam, Generics, Ident, Index, Meta, Variant,
+    parse_macro_input,
 };
 
 fn get_impl_block(ident: &Ident, generics: &Generics) -> impl ToTokens {
@@ -271,4 +272,120 @@ pub fn derive_approx_eq_zero(input: TokenStream) -> TokenStream {
         .into_compile_error()
         .into(),
     }
+}
+
+#[proc_macro_derive(ApproxInternable, attributes(approx_internable_non_float))]
+pub fn derive_approx_hash(input: TokenStream) -> TokenStream {
+    fn parse_float_attr(field: &Field) -> bool {
+        field.attrs.iter().any(|x| {
+            if let Meta::Path(path) = &x.meta
+                && path.is_ident("approx_internable_non_float")
+            {
+                true
+            } else {
+                false
+            }
+        })
+    }
+    fn get_impl_block_hash(ident: &Ident, generics: &Generics) -> impl ToTokens {
+        let gens2 = generics.params.clone().into_iter().map(|p| match p {
+            GenericParam::Lifetime(lifetime_param) => lifetime_param.lifetime.to_token_stream(),
+            GenericParam::Type(type_param) => type_param.ident.to_token_stream(),
+            GenericParam::Const(const_param) => const_param.ident.to_token_stream(),
+        });
+        let gens = generics.params.clone().into_iter();
+        match &generics.where_clause {
+            Some(clause) => {
+                quote! {impl<#(#gens ,)*> ApproxInternable for #ident<#(#gens2 ,)*> #clause}
+            }
+            None => quote! { impl<#(#gens ,)*> ApproxInternable for #ident<#(#gens2 ,)*> },
+        }
+    }
+
+    fn intern_floats_block(data: &Data) -> impl ToTokens {
+        fn get_variant_intern_match(var: &Variant) -> impl ToTokens {
+            let var_name = &var.ident;
+            match &var.fields {
+                Fields::Named(fields_named) => {
+                    let float_fields = fields_named
+                        .named
+                        .iter()
+                        .filter(|f| !parse_float_attr(f))
+                        .map(|x| &x.ident);
+                    let all_fields = fields_named.named.iter().map(|x| &x.ident);
+                    quote! {Self::#var_name{#(#all_fields,)*} => {#(::approx_collections::ApproxInternable::intern_floats(#float_fields, f);)*},}
+                }
+                Fields::Unnamed(fields_unnamed) => {
+                    let self_names =
+                        (0..fields_unnamed.unnamed.len()).map(|x| format_ident!("slf_{}", x));
+                    let self_float_names = (0..fields_unnamed.unnamed.len())
+                        .filter(|x| !parse_float_attr(fields_unnamed.unnamed.get(*x).unwrap()))
+                        .map(|x| format_ident!("slf_{}", x));
+                    quote! {Self::#var_name(#(#self_names,)*) => {#(::approx_collections::ApproxInternable::intern_floats(#self_float_names, f);)*},}
+                }
+                Fields::Unit => quote! {Self::#var_name => {},},
+            }
+        }
+        match data {
+            Data::Struct(data_struct) => match &data_struct.fields {
+                Fields::Named(fields_named) => {
+                    let float_fields = fields_named
+                        .named
+                        .iter()
+                        .filter(|f| !parse_float_attr(f))
+                        .map(|x| &x.ident);
+                    quote! {
+                        fn intern_floats<F: FnMut(&mut f64)>(&mut self, f: &mut F) {
+                            #(::approx_collections::ApproxInternable::intern_floats(&mut self.#float_fields, f);)*
+                        }
+                    }
+                }
+                Fields::Unnamed(fields_unnamed) => {
+                    let float_nums = (0..fields_unnamed.unnamed.len())
+                        .filter(|i| !parse_float_attr(fields_unnamed.unnamed.get(*i).unwrap()))
+                        .map(Index::from);
+                    quote! {
+                        fn intern_floats<F: FnMut(&mut f64)>(&mut self, f: &mut F) {
+                            #(::approx_collections::ApproxInternable::intern_floats(&mut self.#float_nums, f);)*
+                        }
+                    }
+                }
+                Fields::Unit => quote! {
+                    fn intern_floats<F: FnMut(&mut f64)>(&mut self, f: &mut F) {}
+                },
+            },
+            Data::Enum(data_enum) => {
+                let match_vars = data_enum
+                    .variants
+                    .iter()
+                    .map(|x| get_variant_intern_match(x));
+                quote! {
+                    fn intern_floats<F: FnMut(&mut f64)>(&mut self, f: &mut F) {
+                            match self {#(#match_vars)*}
+                    }
+                }
+            }
+
+            Data::Union(_) => Error::new(
+                Span::call_site().into(),
+                "derive(ApproxEqZero) is not implemented for union types.",
+            )
+            .into_compile_error()
+            .into(),
+        }
+    }
+    let DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    } = parse_macro_input!(input);
+    let impl_block = get_impl_block_hash(&ident, &generics);
+    let intern_floats = intern_floats_block(&data);
+    quote! {
+        #impl_block {
+            #intern_floats
+        }
+    }
+    .into()
 }

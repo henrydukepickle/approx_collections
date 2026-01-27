@@ -14,9 +14,6 @@ autotests = true
 [workspace]
 members = ["derive"]
 
-[workspace]
-members = ["derive"]
-
 [workspace.lints.rust]
 missing_docs = "warn"
 rust_2018_idioms = "warn"
