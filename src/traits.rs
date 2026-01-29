@@ -263,7 +263,7 @@ macro_rules! impl_approx_cmp_zero_for_tuple {
 }
 impl_for_tuples!(impl_approx_cmp_zero_for_tuple);
 
-///Trait for types that can be interned (component-wise) in a [`crate::FloatPool`]
+///Trait for types that can be interned (component-wise) in a [`crate::FloatPool`].
 pub trait ApproxInternable {
     /// Interns every float in the object by calling `f`.
     fn intern_floats<F: FnMut(&mut f64)>(&mut self, f: &mut F);
